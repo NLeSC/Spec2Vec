@@ -39,9 +39,10 @@ setup(
     ],
     test_suite='tests',
     install_requires=[
-        "pyteomics",
         "matplotlib",
         "numpy",
+        "openbabel",
+        "pyteomics",
         "pyyaml"
     ],
     setup_requires=[
