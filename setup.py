@@ -42,7 +42,7 @@ setup(
         "pyteomics",
         "matplotlib",
         "numpy",
-        "openbabel"
+        "openbabel",
         "pyyaml"
     ],
     setup_requires=[
