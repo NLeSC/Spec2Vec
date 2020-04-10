@@ -12,6 +12,8 @@
 #
 import os
 import sys
+from mock import Mock as MagicMock
+
 d = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(d,'..'))
 
@@ -77,3 +79,16 @@ html_static_path = ['_static']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return Mock()
+
+MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot',
+                'matplotlib.transforms', 'mpl_toolkits.axes_grid1',
+                'axelrod']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+
+
