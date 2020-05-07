@@ -54,7 +54,7 @@ jobs:
           pytest --cov --cov-report term --cov-report xml --junitxml=xunit-result.xml
       - name: Calculate the docstring coverage
         shell: bash -l {0}
-        run: python calc_docstring_coverage.py
+        run: python calc_docstring_coverage.py --threshold 39
       - name: Correct coverage paths
         if: matrix.os == 'ubuntu-latest'
         run: sed -i "s+$PWD/++g" coverage.xml
