@@ -2,6 +2,7 @@ import glob
 import os
 import sys
 import json
+import argparse
 from docstr_coverage import get_docstring_coverage
 from pathlib import Path
 
@@ -18,7 +19,7 @@ def make_ignore_names():
     ignore_names_file = Path(d, ".docstr_coverage")
 
     if os.path.isfile(ignore_names_file):
-        ignore_names = tuple([line.split() for line in open(ignore_names_file).readlines() if ' ' in line])
+        ignore_names = tuple([line.split() for line in open(ignore_names_file).readlines() if " " in line])
 
     return ignore_names
 
@@ -32,8 +33,16 @@ def calc_coverage():
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Calculate docstring coverage")
+    parser.add_argument("-t", "--threshold", type=int, default=80,
+                        help="Acceptance threshold for docstring calculation")
+
+    args = parser.parse_args()
+
     d = os.path.join(os.path.dirname(__file__))
-    threshold = 39
+    threshold = args.threshold
+
     coverage = calc_coverage()
     if coverage > threshold:
         print("Docstring coverage ({0:.0f}%) satisfies the threshold ({1:.0f}%).".format(coverage, threshold))
