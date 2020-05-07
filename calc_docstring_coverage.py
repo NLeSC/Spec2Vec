@@ -31,7 +31,7 @@ def calc_coverage():
 
 if __name__ == "__main__":
     d = os.path.join(os.path.dirname(__file__))
-    threshold = 80
+    threshold = 39
     coverage = calc_coverage()
     if coverage > threshold:
         sys.exit(0)
