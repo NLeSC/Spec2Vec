@@ -18,86 +18,47 @@ def lookup_metadata_completion(spectrum_in, search_depth=10):
     inchi = spectrum.get("inchi")
     inchikey = spectrum.get("inchikey")
     compound_name = spectrum.get("name")
-    parent_mass = spectrum.get("parent_mass")
-    if inchi:
-        formula = inchi.strip().split("/")[1]
-    else:
-        formula = None
 
-    # Case - -- annotation metadata looks complete
-    if smiles and inchikey and inchi and not inchi.startswith("issue"):
+    # Case 0 -- annotation metadata looks complete
+    if smiles and inchikey and inchi:
         #print("Annotation metadata seems complete (no in-depth checks done).")
         return spectrum
 
     # Case 1 -- Inchikey match
     if is_valid_inchikey(inchikey):
-        try:
-            results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
-                                          "MolecularFormula", "MolecularWeight"],
-                                         inchikey[:14], "inchikey")
-        except:
-            results = None
-        if results:
-            if len(results) == 1:
-                # Unique Inchikey match
-                print("Found match based on inchikey.")
-                add_entries(spectrum, results[0])
-                return spectrum
+        result, log_entry = lookup_by_inchikey(spectrum, search_depth)
+        if result:
+            add_entries(spectrum, result, log_entry)
+            return spectrum
+        print("No matches found for inchikey:", inchikey)
 
-            result = find_matches(results, inchi, inchikey)
-            if result:
-                add_entries(spectrum, result)
-            else:
-                print("No matches found for inchikey:", inchikey)
-
-    # Case 2 -- Unique smiles match
+    # Case 2 -- Smiles match
     if smiles:
-        try:
-            results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
-                                          "MolecularFormula", "MolecularWeight"],
-                                         smiles, "smiles")
-        except:
-            results = None
-        if results:
-            if len(results) == 1:
-                print("Found match based on smiles.")
-                add_entries(spectrum, results[0])
-                return spectrum
+        result, log_entry = lookup_by_smiles(spectrum, search_depth)
+        if result:
+            add_entries(spectrum, result, log_entry)
+            return spectrum
+        print("Found no matches based on smiles.")
 
-            print("Found several matches based on smiles!")
-
-    # Case 3 -- Inchi match
+    # Case 3 -- Inchi match TODO: should be covered by derive functions!
     if is_valid_inchi(inchi):
-        try:
-            results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
-                                          "MolecularFormula", "MolecularWeight"],
-                                         inchi, "inchi")
-        except:
-            results = None
-        if results:
-            # Unique inchi match
-            if len(results) == 1:
-                print("Found match based on inchi.")
-                add_entries(spectrum, results[0])
-                return spectrum
-            # Several inchi matches
-            result = find_matches(results, inchi, inchikey)
-            if result:
-                add_entries(spectrum, result)
-            else:
-                print("No matches found for inchi:", inchi)
-
-    # Case 4 --  Name match
-    if compound_name:
-        result, log_entry = lookup_by_name(compound_name, inchikey, inchi, formula,
-                                           parent_mass, search_depth=search_depth)
+        result, log_entry = lookup_by_inchi(spectrum, search_depth)
         if result:
             add_entries(spectrum, result, log_entry)
             return spectrum
 
-    # Case 4 --  Formula match
-    if formula:
-        result, log_entry = lookup_by_formula(formula, inchikey, inchi, search_depth=search_depth)
+        print("No matches found based on inchi:", inchi)
+
+    # Case 4 -- Name match
+    if compound_name:
+        result, log_entry = lookup_by_name(spectrum, search_depth)
+        if result:
+            add_entries(spectrum, result, log_entry)
+            return spectrum
+
+    # Case 5 -- Formula match
+    if inchi:
+        result, log_entry = lookup_by_formula(spectrum, search_depth)
         if result:
             add_entries(spectrum, result, log_entry)
             return spectrum
@@ -123,90 +84,158 @@ def add_entries(spectrum, lookup_result, log_entry=None):
     if not is_valid_inchikey(inchikey):
         spectrum.set("inchikey", inchikey_pubchem)
         entry_change = True
+
     # Add entry to log the reason for the metadata change
     if entry_change and log_entry:
-        spectrum.set("lookup_completion", log_entry)
+        spectrum.set("metadata_added_based_on", "pubchem_match" + log_entry)
+        print("Added metadata based on: \n", log_entry)
 
 
-def lookup_by_name(name, inchikey=None, inchi=None, formula=None,
-                   parent_mass=None, mass_tolerance=1.0, search_depth=10):
+def lookup_by_inchikey(spectrum, search_depth):
+    inchikey = spectrum.get("inchikey")
+    try:
+        results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
+                                      "MolecularFormula", "MolecularWeight"],
+                                     inchikey[:14], "inchikey", search_depth=search_depth)
+    except:
+        results = []
+    # Look for match with inchi AND inchikey
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchi", "inchikey"],
+                                     min_matches=2)
+    if result:
+        return result, log_entry
+
+    # Look for match with inchi AND inchikey
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["weight", "inchikey"],
+                                     min_matches=2)
+    if result:
+        return result, log_entry
+
+    # Look for match with full inchikey
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchikey_full"],
+                                     min_matches=1)
+    if result:
+        return result, log_entry
+    return None, None
+
+
+def lookup_by_smiles(spectrum, search_depth):
+    smiles = spectrum.get("smiles")
+    try:
+        results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
+                                      "MolecularFormula", "MolecularWeight"],
+                                     smiles, "smiles", search_depth=search_depth)
+    except:
+        results = []
+
+    # Look for match with inchikey
+    result, log_entry = find_matches(results, spectrum, search_criteria=["inchikey"])
+    if result:
+        return result, log_entry + "Smiles match."
+
+    # Accept any of the following: inchi, weight, formula
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchi", "weight", "formula"],
+                                     min_matches=1)
+    if result:
+        return result, log_entry + "Smiles match."
+
+    # Accept unique match with Smiles
+    if len({x.get("InChIKey") for x in results}) == 1:
+        return results[0], "Unique Smiles match."
+    return None, None
+
+
+def lookup_by_inchi(spectrum, search_depth):
+    inchi = spectrum.get("inchi")
+    try:
+        results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
+                                      "MolecularFormula", "MolecularWeight"],
+                                     inchi, "inchi", search_depth=search_depth)
+    except:
+        results = []
+    # Accept any of the following: inchi, weight, formula
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchikey", "weight", "formula"],
+                                     min_matches=1)
+    if result:
+        return result, log_entry
+
+    # Accept unique match with InChI
+    if len({x.get("InChIKey") for x in results}) == 1:
+        return results[0], "Unique InChI match."
+    return None, None
+
+
+def lookup_by_name(spectrum, search_depth):
     """Return PubChem match if found."""
+    compound_name = spectrum.get("name")
 
-    compound_name = extract_compound_name(name)
+    compound_name = extract_compound_name(compound_name)
     if len(compound_name) <= 4:
         return None, None
 
     # Do PubChem lookup
     try:
-        results_name = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
-                                           "MolecularFormula", "MolecularWeight"],
-                                          compound_name, 'name',
-                                          listkey_count=search_depth)
+        results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
+                                      "MolecularFormula", "MolecularWeight"],
+                                     compound_name, 'name',
+                                     listkey_count=search_depth)
     except:
-        print("No matches found.")
-        return None, None
+        results = []
 
-    if len(results_name) == 0:
-        return None, None
+    # Accept unique name match with two of the following
+    if len({x.get("InChIKey") for x in results}) == 1:
+        result, log_entry = find_matches(results, spectrum,
+                                         search_criteria=["inchikey", "inchi", "weight", "formula"],
+                                         min_matches=2)
+        if result:
+            return result, log_entry + "Matching compound name: " + compound_name
 
-    unique_match = len({x.get("InChIKey") for x in results_name}) == 1
+    # Accept unique name match with any of the following
+    if len({x.get("InChIKey") for x in results}) == 1:
+        result, log_entry = find_matches(results, spectrum,
+                                         search_criteria=["inchikey", "inchi", "weight", "formula"],
+                                         min_matches=1)
+        if result:
+            return result, log_entry + "Matching compound name: " + compound_name
 
-    if inchikey and unique_match:
-        # GOOD ENOUGH: one exact name match AND inchikey match
-        if likely_inchikey_match(inchikey, results_name[0].get("InChIKey")):
-            log_entry = "Match by name and inchikey"
-            print(log_entry, "(Name:", compound_name, ")")
-            return results_name[0], log_entry
-
-    # GOOD ENOUGH: one exact name match AND inchi match
-    if likely_inchi_match(inchi, results_name[0].get("InChI")) and unique_match:
-        log_entry = "Match by name and inchi"
-        print(log_entry, "(Name:", compound_name, ")")
-        return results_name[0], log_entry
-
-    # GOOD ENOUGH: one exact name match AND same molecular formula
-    if formula and results_name[0].get("MolecularFormula") == formula and unique_match:
-        log_entry = "Match by name and molecular formula"
-        print(log_entry, "(Name:", compound_name, ")")
-        return results_name[0], log_entry
-
-    # GOOD ENOUGH: one exact name match AND same molecular weight
-    if parent_mass:
-        weight_difference = results_name[0].get("MolecularWeight") - parent_mass
-        if np.abs(weight_difference) < mass_tolerance and unique_match:
-            log_entry = "Match by name and molecular mass"
-            print(log_entry, "(Name:", compound_name, ")")
-            return results_name[0], log_entry
-
-    # More than one match found
-    if not unique_match:
-        result = find_matches(results_name, inchi, inchikey)
-        return result, None  #TODO add log_entry
+    # Accept any of the following: inchi, inchikey
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchikey", "inchi"],
+                                     min_matches=1)
+    if result:
+        return result, log_entry + "Matching compound name: " + compound_name
 
     return None, None
 
 
-def lookup_by_formula(formula, inchikey=None, inchi=None, mass_tolerance=1.0,
-                      search_depth=10):
+def lookup_by_formula(spectrum, search_depth):
     """Return PubChem match if found."""
-
-    # Do PubChem lookup
+    inchi = spectrum.get("inchi")
+    if inchi:
+        formula = inchi.strip().split("/")[1]
+    else:
+        return None, None
     try:
-        results_formula = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
-                                              "MolecularFormula", "MolecularWeight"],
-                                             formula, "formula",
-                                             listkey_count=search_depth)
+        results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
+                                      "MolecularFormula", "MolecularWeight"],
+                                     formula, "formula",
+                                     listkey_count=search_depth)
     except:
-        print("No matches found.")
-        return None, None
+        results = []
 
-    if len(results_formula) == 0:
-        return None, None
+    # Accept any of the following: inchi, inchikey
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchikey", "inchi"],
+                                     min_matches=1)
+    if result:
+        return result, log_entry
 
-    # Matches found
-    if len(results_formula) > 0:
-        result = find_matches(results_formula, inchi, inchikey)
-        return result, None  # TODO add log entry
+    return None, None
 
 
 def extract_compound_name(name):
@@ -248,33 +277,93 @@ def extract_compound_name(name):
     return name.rstrip()
 
 
-def find_matches(pubchem_results, inchi=None, inchikey=None,
-                 min_inchi_match=3, min_inchikey_match=1):
+def find_matches(pubchem_results, spectrum, search_criteria=["inchi", "inchikey"],
+                 min_matches=2):
     """Find matching compound from pubchem search."""
-    assert is_valid_inchikey(inchikey) or inchi is not None, "Not enough input."
-    if not is_valid_inchikey(inchikey):
-        inchikey = "not provided"
-
+    min_matches = min(min_matches, len(search_criteria))
+    matching_functions = {"inchi": inchi_match,
+                          "inchikey": inchikey_match,
+                          "inchikey_full": inchikey_full_match,
+                          "formula": formula_match,
+                          "weight": weight_match}
     for result in pubchem_results:
-        inchi_pubchem = result["InChI"]
-        inchikey_pubchem = result["InChIKey"]
+        log_entry = ""
+        matches = []
+        for criterium in search_criteria:
+            match_bool, log = matching_functions[criterium](result, spectrum)
+            matches.append(match_bool)
+            log_entry += log
+        if sum(matches) >= min_matches:
+            return result, log_entry
+    return None, ""
 
-        match_inchikey = likely_inchikey_match(inchikey, inchikey_pubchem,
-                                               min_agreement=min_inchikey_match)
 
-        if inchi:
-            match_inchi = likely_inchi_match(inchi, inchi_pubchem,
-                                             min_agreement=min_inchi_match)
-        else:
-            match_inchi = False
+def inchi_match(pubchem_result, spectrum, min_inchi_match=3):
+    """True when inchi match is found"""
+    inchi = spectrum.get("inchi")
+    if inchi is None:
+        return False, ""  #"No inchi."
+    inchi_pubchem = pubchem_result.get("InChI")
+    if likely_inchi_match(inchi, inchi_pubchem, min_agreement=min_inchi_match):
+        log_entry = "Matching inchi (>= {} parts).".format(min_inchi_match)
+        return True, log_entry
+    return False, ""  #"No found inchi match."
 
-        # GOOD ENOUGH: first time match between inchi and/or inchikey
-        if match_inchi or match_inchikey:
-            print("Match based on: ", match_inchi * "InChI", ", ",
-                  match_inchikey * "InchiKey", ".")
-            return result
 
-    return None
+def inchikey_match(pubchem_result, spectrum, min_inchikey_match=1):
+    """True when inchikey match is found"""
+    inchikey = spectrum.get("inchikey")
+    if inchikey is None:
+        return False, ""  #"No inchikey."
+    inchikey_pubchem = pubchem_result.get("InChIKey")
+    if likely_inchikey_match(inchikey, inchikey_pubchem, min_agreement=min_inchikey_match):
+        log_entry = "Matching inchikey (>= {} parts).".format(min_inchikey_match)
+        return True, log_entry
+    return False, ""  #"No found inchikey match."
+
+
+def inchikey_full_match(pubchem_result, spectrum, min_inchikey_match=3):
+    """True when full inchikey match is found"""
+    inchikey = spectrum.get("inchikey")
+    if inchikey is None:
+        return False, ""  #"No inchikey."
+    inchikey_pubchem = pubchem_result.get("InChIKey")
+    if likely_inchikey_match(inchikey, inchikey_pubchem, min_agreement=min_inchikey_match):
+        log_entry = "Matching inchikey (>= {} parts).".format(min_inchikey_match)
+        return True, log_entry
+    return False, ""  #"No found inchikey match."
+
+
+def formula_match(pubchem_result, spectrum):
+    """True when formula match is found"""
+    inchi = spectrum.get("inchi")
+    if inchi:
+        formula = inchi.strip().split("/")[1]
+    else:
+        formula = None
+
+    formula_pubchem = pubchem_result.get("MolecularFormula")
+
+    if formula and formula_pubchem:
+        if formula.upper().strip() == formula_pubchem.upper().strip():
+            log_entry = "Matching formula."
+            return True, log_entry
+        return False, ""  #"No found formula match."
+    return False, ""
+
+
+def weight_match(pubchem_result, spectrum, mass_tolerance=1.0):
+    """True when parent mass matches molecular weight."""
+    weight = pubchem_result.get("MolecularWeight")
+    parent_mass = spectrum.get("parent_mass")
+    if parent_mass is None or parent_mass == 0:
+        return False, ""  #"No parent mass found."
+    if parent_mass and weight:
+        weight_difference = weight - parent_mass
+        if np.abs(weight_difference) < mass_tolerance:
+            log_entry = "Matching molecular weight {:.1f} vs parent mass {:.1f}.".format(weight, parent_mass)
+            return True, log_entry
+    return False, ""  #"No found weight match."
 
 
 def likely_inchi_match(inchi_1, inchi_2, min_agreement=3):
@@ -344,8 +433,8 @@ def likely_inchikey_match(inchikey_1, inchikey_2, min_agreement=2):
     agreement = 0
 
     # Harmonize strings
-    inchikey_1 = inchikey_1.upper().replace('"', '').replace(' ', '')
-    inchikey_2 = inchikey_2.upper().replace('"', '').replace(' ', '')
+    inchikey_1 = inchikey_1.upper().strip('"').replace(' ', '')
+    inchikey_2 = inchikey_2.upper().strip('"').replace(' ', '')
 
     # Split inchikey in parts.
     inchikey_1_parts = inchikey_1.split('-')
