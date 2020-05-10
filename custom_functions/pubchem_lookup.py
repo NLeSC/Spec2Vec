@@ -92,6 +92,7 @@ def add_entries(spectrum, lookup_result, log_entry=None):
 
 
 def lookup_by_inchikey(spectrum, search_depth):
+    """Search for match by PubChem lookup based on inchikey."""
     inchikey = spectrum.get("inchikey")
     try:
         results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
@@ -123,6 +124,7 @@ def lookup_by_inchikey(spectrum, search_depth):
 
 
 def lookup_by_smiles(spectrum, search_depth):
+    """Search for match by PubChem lookup based on smiles."""
     smiles = spectrum.get("smiles")
     try:
         results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
@@ -150,6 +152,7 @@ def lookup_by_smiles(spectrum, search_depth):
 
 
 def lookup_by_inchi(spectrum, search_depth):
+    """Search for match by PubChem lookup based on inchi."""
     inchi = spectrum.get("inchi")
     try:
         results = pcp.get_properties(["InChIKey", "InChI", "IsomericSMILES",
@@ -171,7 +174,7 @@ def lookup_by_inchi(spectrum, search_depth):
 
 
 def lookup_by_name(spectrum, search_depth):
-    """Return PubChem match if found."""
+    """Search for match by PubChem lookup based on name."""
     compound_name = spectrum.get("name")
 
     compound_name = extract_compound_name(compound_name)
@@ -193,7 +196,7 @@ def lookup_by_name(spectrum, search_depth):
                                          search_criteria=["inchikey", "inchi", "weight", "formula"],
                                          min_matches=2)
         if result:
-            return result, log_entry + "Matching compound name: " + compound_name
+            return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
     # Accept unique name match with any of the following
     if len({x.get("InChIKey") for x in results}) == 1:
@@ -201,20 +204,20 @@ def lookup_by_name(spectrum, search_depth):
                                          search_criteria=["inchikey", "inchi", "weight", "formula"],
                                          min_matches=1)
         if result:
-            return result, log_entry + "Matching compound name: " + compound_name
+            return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
     # Accept any of the following: inchi, inchikey
     result, log_entry = find_matches(results, spectrum,
                                      search_criteria=["inchikey", "inchi"],
                                      min_matches=1)
     if result:
-        return result, log_entry + "Matching compound name: " + compound_name
+        return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
     return None, None
 
 
 def lookup_by_formula(spectrum, search_depth):
-    """Return PubChem match if found."""
+    """Search for match by PubChem lookup based on molecular formula."""
     inchi = spectrum.get("inchi")
     if inchi:
         formula = inchi.strip().split("/")[1]
@@ -360,8 +363,8 @@ def weight_match(pubchem_result, spectrum, mass_tolerance=1.0):
         return False, ""  #"No parent mass found."
     if parent_mass and weight:
         weight_difference = weight - parent_mass
-        if np.abs(weight_difference) < mass_tolerance:
-            log_entry = "Matching molecular weight {:.1f} vs parent mass {:.1f}.".format(weight, parent_mass)
+        if np.abs(weight_difference) <= mass_tolerance:
+            log_entry = "Matching molecular weight ({:.1f} vs parent mass {:.1f}).".format(weight, parent_mass)
             return True, log_entry
     return False, ""  #"No found weight match."
 
