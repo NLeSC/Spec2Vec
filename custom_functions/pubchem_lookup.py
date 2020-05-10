@@ -316,9 +316,10 @@ def inchi_match(pubchem_result, spectrum, min_inchi_match=3):
 def inchikey_match(pubchem_result, spectrum, min_inchikey_match=1):
     """True when inchikey match is found"""
     inchikey = spectrum.get("inchikey")
-    if inchikey is None:
-        return False, ""  #"No inchikey."
     inchikey_pubchem = pubchem_result.get("InChIKey")
+    if inchikey is None or inchikey_pubchem is None:
+        return False, ""
+
     if likely_inchikey_match(inchikey, inchikey_pubchem, min_agreement=min_inchikey_match):
         log_entry = "Matching inchikey (>= {} parts).".format(min_inchikey_match)
         return True, log_entry
@@ -387,6 +388,9 @@ def likely_inchi_match(inchi_1, inchi_2, min_agreement=3):
         Minimum number of first parts that MUST be a match between both input
         inchi to finally consider it a match. Default is min_agreement=3.
     """
+    if inchi_1 is None or inchi_2 is None:
+        return False
+
     if min_agreement < 2:
         print("Warning! 'min_agreement' < 2 has no discriminative power. Should be => 2.")
     if min_agreement == 2:
@@ -434,6 +438,9 @@ def likely_inchikey_match(inchikey_1, inchikey_2, min_agreement=2):
     if min_agreement not in [1, 2, 3]:
         print("Warning! 'min_agreement' should be 1, 2, or 3.")
     agreement = 0
+
+    if inchikey_1 is None or inchikey_2 is None:
+        return False
 
     # Harmonize strings
     inchikey_1 = inchikey_1.upper().strip('"').replace(' ', '')
