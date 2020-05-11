@@ -87,7 +87,7 @@ def add_entries(spectrum, lookup_result, log_entry=None):
 
     # Add entry to log the reason for the metadata change
     if entry_change and log_entry:
-        spectrum.set("metadata_added_based_on", "pubchem_match" + log_entry)
+        spectrum.set("metadata_added_based_on", "PubChem match:" + log_entry)
         print("Added metadata based on: \n", log_entry)
 
 
@@ -147,7 +147,7 @@ def lookup_by_smiles(spectrum, search_depth):
 
     # Accept unique match with Smiles
     if len({x.get("InChIKey") for x in results}) == 1:
-        return results[0], "Unique Smiles match."
+        return results[0], "Unique Smiles match ({}).".format(smiles)
     return None, None
 
 
@@ -169,7 +169,7 @@ def lookup_by_inchi(spectrum, search_depth):
 
     # Accept unique match with InChI
     if len({x.get("InChIKey") for x in results}) == 1:
-        return results[0], "Unique InChI match."
+        return results[0], "Unique InChI match ({}).".format(inchi)
     return None, None
 
 
