@@ -1,7 +1,5 @@
-import re
 import numpy as np
 import pubchempy as pcp
-from matchms.importing import load_adducts
 from matchms.utils import is_valid_inchi, is_valid_inchikey, is_valid_smiles
 
 
@@ -175,10 +173,9 @@ def lookup_by_inchi(spectrum, search_depth):
 
 def lookup_by_name(spectrum, search_depth):
     """Search for match by PubChem lookup based on name."""
-    compound_name = spectrum.get("name")
+    compound_name = spectrum.get("compound_name")
 
-    compound_name = extract_compound_name(compound_name)
-    if len(compound_name) <= 4:
+    if len(compound_name) <= 4:  # no meaningful name
         return None, None
 
     # Do PubChem lookup
@@ -239,45 +236,6 @@ def lookup_by_formula(spectrum, search_depth):
         return result, log_entry
 
     return None, None
-
-
-def extract_compound_name(name):
-    """Clean compound name. Includes removing potential adduct."""
-    known_adducts = load_adducts()
-    adduct_original = name.split(' ')[-1]
-    adduct = adduct_original.replace('\n', '')\
-                            .replace(' ', '')\
-                            .replace('[', '')\
-                            .replace(']', '')\
-                            .replace('*', '')
-    if adduct in known_adducts["adducts_negative"] or adduct in known_adducts["adducts_positive"]:
-        name = name.replace(adduct_original, '')
-
-    # Clean string further:
-    # remove type NCGC00180417-03_C31H40O16_
-    name = re.split(r"[A-Z]{3,}[0-9]{8,}-[0-9]{2,}_[A-Z,0-9]{4,}_", name)[-1]
-    # remove type NCGC00160232-01! or MLS001142816-01!
-    name = re.split(r"[A-Z]{3,}[0-9]{8,}-[0-9]{2,}\!", name)[-1]
-    # remove type Massbank:EA008813 or MassbankEU:EA008813
-    name = re.split(r"[A-Z]{2,}[0-9]{5,}", name)[-1]
-    # remove type HMDB:HMDB00943-1336
-    name = re.split(r"HMDB:HMDB[0-9]{4,}-[0-9]{1,}", name)[-1]
-    # remove type MoNA:662599
-    name = re.split(r"HMDB:HMDB[0-9]{4,}-[0-9]{1,}", name)[-1]
-    # ReSpect:PS013405 option1|option2|option3... [M+H]
-    #TODO non ideal --> here just pick the last given compound name
-    name = re.split(r"ReSpect:[A-Z]{2,}[0-9]{5,}.*\|", name)[-1]
-    # remove type 0072_2-Mercaptobenzothiaz
-    name = re.split(r"[0-9]{4}_", name)[-1]
-
-    # Remove further non compound-name parts
-    parts_remove = ["Spectral Match to",
-                    "from NIST14",
-                    "Massbank:"]
-    for part in parts_remove:
-        name = name.replace(part, "")
-
-    return name.rstrip()
 
 
 def find_matches(pubchem_results, spectrum, search_criteria=["inchi", "inchikey"],
