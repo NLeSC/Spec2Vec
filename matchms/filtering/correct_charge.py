@@ -3,7 +3,8 @@ from ..typing import SpectrumType
 
 
 def correct_charge(spectrum_in: SpectrumType) -> SpectrumType:
-    """
+    """Correct charge values based on given ionmode.
+
     For some spectrums, the charge value is either undefined or inconsistent with its
     ionmode, which is corrected by this filter.
     """
@@ -14,12 +15,16 @@ def correct_charge(spectrum_in: SpectrumType) -> SpectrumType:
     spectrum = spectrum_in.clone()
 
     ionmode = spectrum.get("ionmode", None)
+    if ionmode:
+        assert ionmode == ionmode.lower(), ("Ionmode field not harmonized.",
+                                            "Apply 'make_ionmode_lowercase' filter first.")
 
     charge = spectrum.get("charge", None)
 
     if charge is None:
         charge = 0
-    elif charge == 0 and ionmode == 'positive':
+
+    if charge == 0 and ionmode == 'positive':
         charge = 1
     elif charge == 0 and ionmode == 'negative':
         charge = -1
