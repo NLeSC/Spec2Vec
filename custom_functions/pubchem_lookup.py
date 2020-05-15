@@ -15,7 +15,7 @@ def lookup_metadata_completion(spectrum_in, search_depth=10):
     smiles = spectrum.get("smiles")
     inchi = spectrum.get("inchi")
     inchikey = spectrum.get("inchikey")
-    compound_name = spectrum.get("name")
+    compound_name = spectrum.get("compound_name")
 
     # Case 0 -- annotation metadata looks complete
     if smiles and inchikey and inchi:
