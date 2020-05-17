@@ -1,8 +1,8 @@
-import func-timeout
 import numpy as np
 import pubchempy as pcp
+from func_timeout import func_set_timeout
 from matchms.utils import is_valid_inchi, is_valid_inchikey, is_valid_smiles
-
+import time
 
 def lookup_metadata_completion(spectrum_in, search_depth=10):
     """Look for missing metadata and try to complete by PubChem lookups."""
@@ -55,9 +55,10 @@ def lookup_metadata_completion(spectrum_in, search_depth=10):
         if result:
             add_entries(spectrum, result, log_entry)
             return spectrum
-        if "No matches for compound name" in log_entry:
-            # Avoid doing failed searches twice
-            names_with_no_matches.append(compound_name)
+        if log_entry:
+            if "No matches for compound name" in log_entry:
+                # Avoid doing failed searches twice
+                names_with_no_matches.append(compound_name)
 
     # Case 5 -- Formula match
     if inchi:
@@ -94,7 +95,7 @@ def add_entries(spectrum, lookup_result, log_entry=None):
         print("Added metadata based on: \n", log_entry)
 
 
-@func_set_timeout(5)
+@func_set_timeout(10)
 def pubchem_get_properties(property_lst, search_item, search_item_name, search_depth):
     """Search PubChem."""
     results = pcp.get_properties(property_lst, search_item,
@@ -106,12 +107,14 @@ def lookup_by_inchikey(spectrum, search_depth):
     """Search for match by PubChem lookup based on inchikey."""
     inchikey = spectrum.get("inchikey")
     search_item_name = "inchikey"
+    tstart = time.time()
     try:
         results = pubchem_get_properties(["InChIKey", "InChI", "IsomericSMILES",
                                           "MolecularFormula", "MolecularWeight"],
                                          inchikey[:14], search_item_name, search_depth=search_depth)
     except:
-        print("Timeout or no match found for search based on", search_item_name)
+        if (time.time() - tstart) > 10:
+            print("Timeout.")#" or no match found for search based on", search_item_name)
         results = []
     # Look for match with inchi AND inchikey
     result, log_entry = find_matches(results, spectrum,
@@ -145,7 +148,7 @@ def lookup_by_smiles(spectrum, search_depth):
                                           "MolecularFormula", "MolecularWeight"],
                                          smiles, search_item_name, search_depth=search_depth)
     except:
-        print("Timeout or no match found for search based on", search_item_name)
+        #print("Timeout or no match found for search based on", search_item_name)
         results = []
 
     # Look for match with inchikey
@@ -166,7 +169,6 @@ def lookup_by_smiles(spectrum, search_depth):
     return None, None
 
 
-@func_set_timeout(5)
 def lookup_by_inchi(spectrum, search_depth):
     """Search for match by PubChem lookup based on inchi."""
     inchi = spectrum.get("inchi")
@@ -175,7 +177,7 @@ def lookup_by_inchi(spectrum, search_depth):
                                       "MolecularFormula", "MolecularWeight"],
                                      inchi, "inchi", search_depth=search_depth)
     except:
-        print("Timeout or no match found for search based on", search_item_name)
+        # print("Timeout or no match found for search based on", search_item_name)
         results = []
     # Accept any of the following: inchi, weight, formula
     result, log_entry = find_matches(results, spectrum,
@@ -193,18 +195,20 @@ def lookup_by_inchi(spectrum, search_depth):
 def lookup_by_name(spectrum, search_depth):
     """Search for match by PubChem lookup based on name."""
     compound_name = spectrum.get("compound_name")
-    search_item_name = "compound_name"
+    search_item_name = "name"
     if len(compound_name) <= 4:  # no meaningful name
         return None, None
 
     # Do PubChem lookup
+    tstart = time.time()
     try:
         results = pubchem_get_properties(["InChIKey", "InChI", "IsomericSMILES",
                                           "MolecularFormula", "MolecularWeight"],
-                                         compound_name, search_item_name,
-                                         listkey_count=search_depth)
+                                         compound_name, "name", search_depth=search_depth)
     except:
-        print("Timeout or no match found for search based on", search_item_name)
+        if (time.time() - tstart) > 10:
+            print("Timeout.")#
+        #print("Timeout or no match found for search based on", search_item_name)
         results = []
 
     # Accept unique name match with two of the following
@@ -223,6 +227,13 @@ def lookup_by_name(spectrum, search_depth):
         if result:
             return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
+    # Accept match with two of the following: inchi, inchikey, weight, formula
+    result, log_entry = find_matches(results, spectrum,
+                                     search_criteria=["inchikey", "inchi", "weight", "formula"],
+                                     min_matches=2)
+    if result:
+        return result, log_entry + "Matching compound name ({}).".format(compound_name)
+
     # Accept any of the following: inchi, inchikey
     result, log_entry = find_matches(results, spectrum,
                                      search_criteria=["inchikey", "inchi"],
@@ -230,30 +241,34 @@ def lookup_by_name(spectrum, search_depth):
     if result:
         return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
-    return None, None
+    return None, "No matches for compound name."
 
 
 def lookup_by_formula(spectrum, search_depth):
     """Search for match by PubChem lookup based on molecular formula."""
+    formula = spectrum.get("formula")
     inchi = spectrum.get("inchi")
     search_item_name = "formula"
-    if inchi:
+    if inchi and not formula:
         formula = inchi.strip().split("/")[1]
-    else:
+
+    if formula is None:
         return None, None
+
     try:
         results = pubchem_get_properties(["InChIKey", "InChI", "IsomericSMILES",
                                           "MolecularFormula", "MolecularWeight"],
                                          formula, search_item_name,
                                          listkey_count=search_depth)
     except:
-        print("Timeout or no match found for search based on", search_item_name)
+        #print("Timeout or no match found for search based on", search_item_name)
         results = []
 
     # Accept any of the following: inchi, inchikey
     result, log_entry = find_matches(results, spectrum,
                                      search_criteria=["inchikey", "inchi"],
                                      min_matches=1)
+
     if result:
         return result, log_entry
 
@@ -336,7 +351,7 @@ def formula_match(pubchem_result, spectrum):
     return False, ""
 
 
-def weight_match(pubchem_result, spectrum, mass_tolerance=1.0):
+def weight_match(pubchem_result, spectrum, mass_tolerance=2.0):
     """True when parent mass matches molecular weight."""
     weight = pubchem_result.get("MolecularWeight")
     parent_mass = spectrum.get("parent_mass")
