@@ -164,7 +164,7 @@ def lookup_by_smiles(spectrum, search_depth):
         return result, log_entry + "Smiles match."
 
     # Accept unique match with Smiles
-    if len({x.get("InChIKey") for x in results}) == 1:
+    if len({x.get("InChIKey", "")[:14] for x in results}) == 1:
         return results[0], "Unique Smiles match ({}).".format(smiles)
     return None, None
 
@@ -187,7 +187,7 @@ def lookup_by_inchi(spectrum, search_depth):
         return result, log_entry
 
     # Accept unique match with InChI
-    if len({x.get("InChIKey") for x in results}) == 1:
+    if len({x.get("InChIKey", "")[:14] for x in results}) == 1:
         return results[0], "Unique InChI match ({}).".format(inchi)
     return None, None
 
@@ -212,7 +212,7 @@ def lookup_by_name(spectrum, search_depth):
         results = []
 
     # Accept unique name match with two of the following
-    if len({x.get("InChIKey") for x in results}) == 1:
+    if len({x.get("InChIKey", "")[:14] for x in results}) == 1:
         result, log_entry = find_matches(results, spectrum,
                                          search_criteria=["inchikey", "inchi", "weight", "formula"],
                                          min_matches=2)
@@ -220,7 +220,7 @@ def lookup_by_name(spectrum, search_depth):
             return result, log_entry + "Matching compound name ({}).".format(compound_name)
 
     # Accept unique name match with any of the following
-    if len({x.get("InChIKey") for x in results}) == 1:
+    if len({x.get("InChIKey", "")[:14] for x in results}) == 1:
         result, log_entry = find_matches(results, spectrum,
                                          search_criteria=["inchikey", "inchi", "weight", "formula"],
                                          min_matches=1)
@@ -240,6 +240,17 @@ def lookup_by_name(spectrum, search_depth):
                                      min_matches=1)
     if result:
         return result, log_entry + "Matching compound name ({}).".format(compound_name)
+
+    # # Accept one of <=5 name matches with one of the following (if unambiguous)
+    # if len({x.get("InChIKey", "")[:14] for x in results}) <= 5:
+        
+    #     result, log_entry = find_matches(results, spectrum,
+    #                                      search_criteria=["weight", "formula"],
+    #                                      min_matches=1)
+    #     if result:
+    #         num_name_matches = len({x.get("InChIKey", "")[:14] for x in results})
+    #         return result, log_entry + "Among {} entries matching compound name ({}).".format(num_name_matches,
+    #                                                                                           compound_name)
 
     return None, "No matches for compound name."
 
