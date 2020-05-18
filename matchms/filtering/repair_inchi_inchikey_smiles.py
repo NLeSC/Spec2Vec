@@ -13,9 +13,10 @@ def repair_inchi_inchikey_smiles(spectrum_in: SpectrumType):
     inchi = spectrum.get("inchi", "")
     inchiaux = spectrum.get("inchiaux", "")
     inchikey = spectrum.get("inchikey", "")
+    inchikey_inchi = spectrum.get("inchikey_inchi", "")
     smiles = spectrum.get("smiles", "")
 
-    cleaneds = [SpeciesString(s) for s in [inchi, inchiaux, inchikey, smiles]]
+    cleaneds = [SpeciesString(s) for s in [inchi, inchikey, inchikey_inchi, inchiaux, smiles]]
 
     # for each type, list what we have and pick one
     inchis = [c.cleaned for c in cleaneds if c.target == "inchi" and c.cleaned != ""]
