@@ -22,8 +22,9 @@ def derive_adduct_from_name(spectrum_in: SpectrumType, remove_adduct_from_name=T
     if spectrum.get("compound_name", None):
         name = spectrum.get("compound_name")
     else:
-        assert spectrum.get("name", None) is not None, ("Found 'name' but not 'compound_name' in metadata",
-                                                        "Apply 'add_compound_name' filter first.")
+        print(spectrum.get("name", None))
+        assert spectrum.get("name", None) is None, ("Found 'name' but not 'compound_name' in metadata",
+                                                    "Apply 'add_compound_name' filter first.")
         print("No compound name found in metadata.")
         return spectrum
 
