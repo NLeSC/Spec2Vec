@@ -195,7 +195,6 @@ def lookup_by_inchi(spectrum, search_depth):
 def lookup_by_name(spectrum, search_depth):
     """Search for match by PubChem lookup based on name."""
     compound_name = spectrum.get("compound_name")
-    search_item_name = "name"
     if len(compound_name) <= 4:  # no meaningful name
         return None, None
 
@@ -208,7 +207,6 @@ def lookup_by_name(spectrum, search_depth):
     except:
         if (time.time() - tstart) > 10:
             print("Timeout.")#
-        #print("Timeout or no match found for search based on", search_item_name)
         results = []
 
     # Accept unique name match with two of the following
